@@ -1,0 +1,84 @@
+;; ERT Tests for Resolution Theorem Prover
+
+(require 'ert)
+
+(ert-deftest test-socrates-mortality ()
+  "Test the classic Socrates syllogism."
+  (should (prove '(dies socrates)
+                 '((forall (x) (implies (mortal x) (dies x)))
+                   (forall (x) (implies (human x) (mortal x)))
+                   (human socrates))
+                 nil)))
+
+(ert-deftest test-tweety-eating ()
+  "Test transitive reasoning about Tweety eating worms."
+  (should (prove '(eats tweety worms)
+                 '((forall (x) (implies (canary x) (bird x)))
+                   (forall (x) (implies (bird x) (eats x worms)))
+                   (canary tweety))
+                 nil)))
+
+(ert-deftest test-fluffy-happiness ()
+  "Test multiple-step deduction about Fluffy's happiness."
+  (should (prove '(happy fluffy)
+                 '((forall (x) (implies (cat x) (likes x milk)))
+                   (forall (x) (implies (likes x milk) (happy x)))
+                   (cat fluffy))
+                 nil)))
+
+(ert-deftest test-tweety-flying ()
+  "Test conjunction in premises."
+  (should (prove '(flies tweety)
+                 '((forall (x) (implies (and (bird x) (healthy x)) (flies x)))
+                   (bird tweety)
+                   (healthy tweety))
+                 nil)))
+
+(ert-deftest test-double-negation ()
+  "Test handling of double negation."
+  (should (prove '(mortal socrates)
+                 '((forall (x) (implies (human x) (mortal x)))
+                   (not (not (human socrates))))
+                 nil)))
+
+(ert-deftest test-complex-chain ()
+  "Test longer chain of implications."
+  (should (prove '(likes john music)
+                 '((forall (x) (implies (student x) (likes x learning)))
+                   (forall (x) (implies (likes x learning) (likes x books)))
+                   (forall (x) (implies (likes x books) (likes x music)))
+                   (student john))
+                 nil)))
+
+(ert-deftest test-negative-case ()
+  "Test that invalid conclusions are not proven."
+  (should-not (prove '(flies elephant)
+                     '((forall (x) (implies (bird x) (flies x)))
+                       (forall (x) (implies (mammal x) (not (bird x))))
+                       (mammal elephant))
+                     nil)))
+
+(ert-deftest test-simple-contradiction ()
+  "Test that contradictions are handled correctly."
+  (should-not (prove '(bird tweety)
+                     '((not (bird tweety))
+                       (bird tweety))
+                     nil)))
+
+;; Helper function to run tests with debug output
+(defun run-test-with-debug (test-name)
+  "Run a specific test with debug output enabled."
+  (let ((test-symbol (intern test-name)))
+    (prove (ert-test-expected-result-type (ert-get-test test-symbol))
+          (ert-test-body (ert-get-test test-symbol))
+          t)))
+
+;; Example usage:
+;; Run all tests:
+;; (ert "^test-")
+;;
+;; Run specific test:
+;; (ert 'test-socrates-mortality)
+;;
+;; Run with debug output:
+;; (run-test-with-debug "test-socrates-mortality")
