@@ -1,0 +1,17 @@
+# Byte-compiled Emacs Lisp
+*.elc
+
+# Backup files
+*~
+\#*\#
+.\#*
+
+# Auto-save files
+.auto-save-*
+
+# Package archives
+*.tar
+
+# OS files
+.DS_Store
+Thumbs.db

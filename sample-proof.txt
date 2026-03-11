@@ -1,0 +1,169 @@
+;; sample-proof.txt — Annotated proof traces for emacs-atp
+;;
+;; Load with: (load-file "emacs-atp.el")
+;;
+;; These examples show the ATP in action. Run any of them
+;; interactively with debug output (pass t as the third argument
+;; to prove) to see the resolution steps.
+
+;; ============================================================
+;; Example 1: Socrates Mortality (classic syllogism)
+;; ============================================================
+;;
+;; KB:   All humans are mortal. Socrates is human.
+;; Goal: Socrates is mortal.
+;;
+;;   (prove '(mortal socrates)
+;;          '((forall (x) (implies (human x) (mortal x)))
+;;            (human socrates))
+;;          t)
+;;
+;; CNF conversion:
+;;   "forall x. human(x) -> mortal(x)"
+;;     rename x -> _V1
+;;     eliminate implication: (or (not (human _V1)) (mortal _V1))
+;;     clause: {~human(_V1), mortal(_V1)}
+;;
+;;   "human(socrates)"
+;;     clause: {human(socrates)}
+;;
+;;   negated goal: "not(mortal(socrates))"
+;;     clause: {~mortal(socrates)}
+;;
+;; Resolution:
+;;   Iter 1: given = {~mortal(socrates)}
+;;     Resolve with {~human(_V3), mortal(_V3)}:
+;;       Unify mortal(socrates) with mortal(_V3)
+;;       MGU = {_V3 -> socrates}
+;;       Resolvent: {~human(socrates)}
+;;
+;;   Iter 2: given = {~human(socrates)}
+;;     Resolve with {human(socrates)}:
+;;       Unify human(socrates) with human(socrates)
+;;       MGU = {} (marker only)
+;;       Resolvent: {} -- EMPTY CLAUSE!
+;;
+;;   PROVED in 2 iterations.
+
+;; ============================================================
+;; Example 2: Three-step chain
+;; ============================================================
+;;
+;;   (prove '(D socrates)
+;;          '((forall (x) (implies (A x) (B x)))
+;;            (forall (x) (implies (B x) (C x)))
+;;            (forall (x) (implies (C x) (D x)))
+;;            (A socrates))
+;;          t)
+;;
+;; Clauses:
+;;   {~A(_V1), B(_V1)}
+;;   {~B(_V2), C(_V2)}
+;;   {~C(_V3), D(_V3)}
+;;   {A(socrates)}
+;;   Negated goal: {~D(socrates)}
+;;
+;; Resolution chain:
+;;   {~D(socrates)}  x  {~C(_V3), D(_V3)}  ->  {~C(socrates)}
+;;   {~C(socrates)}  x  {~B(_V2), C(_V2)}  ->  {~B(socrates)}
+;;   {~B(socrates)}  x  {~A(_V1), B(_V1)}  ->  {~A(socrates)}
+;;   {~A(socrates)}  x  {A(socrates)}       ->  {} PROVED
+
+;; ============================================================
+;; Example 3: Disjunctive syllogism
+;; ============================================================
+;;
+;;   (prove '(Q A)
+;;          '((or (P A) (Q A))
+;;            (not (P A))))
+;;
+;; Clauses:
+;;   {P(A), Q(A)}
+;;   {~P(A)}
+;;   Negated goal: {~Q(A)}
+;;
+;; Resolution:
+;;   {~Q(A)} x {P(A), Q(A)}  ->  {P(A)}
+;;   {P(A)}  x {~P(A)}        ->  {} PROVED
+
+;; ============================================================
+;; Example 4: Dungeon game -- key unlocks treasury
+;; ============================================================
+;;
+;; This is how the dungeon game validates actions. The rules
+;; and facts are FOL axioms; the ATP proves preconditions.
+;;
+;; Rules:
+;;   forall k,d. has(player,k) ^ key-for(k,d) ^ locked(d)
+;;               -> can-unlock(player,d)
+;;
+;; Facts:
+;;   has(player, rusty-key)
+;;   key-for(rusty-key, treasury)
+;;   locked(treasury)
+;;
+;; Query: can-unlock(player, treasury)?
+;;
+;; The ATP negates the goal, produces clauses from the conjunction
+;; in the rule antecedent, and resolves against the facts.
+;; Each conjunct is resolved in turn until the empty clause
+;; is derived. The action succeeds.
+
+;; ============================================================
+;; Example 5: Dungeon game -- action correctly denied
+;; ============================================================
+;;
+;; If the player does NOT have the sword:
+;;
+;;   (prove '(can-fight player fomorian-guard)
+;;          '((forall (e)
+;;              (implies (and (has player sword-of-light) (fomorian e))
+;;                       (can-fight player e)))
+;;            (fomorian fomorian-guard))
+;;          nil 200)
+;;   => nil
+;;
+;; The proof fails because (has player sword-of-light) is not
+;; in the KB. The ATP exhausts all resolution possibilities
+;; within the iteration limit and returns nil.
+;;
+;; This is the key insight: the ATP doesn't just pattern-match --
+;; it PROVES things. If a precondition is missing, the proof
+;; fails, and the game action is denied.
+
+;; ============================================================
+;; Example 6: Skolemization
+;; ============================================================
+;;
+;; Existential quantifiers are removed by Skolemization:
+;;
+;;   (atp--reset-counters)
+;;   (atp--formula-to-clauses '(exists (x) (P x)))
+;;   ;; => (((P _sk1)))
+;;   ;; The Skolem constant _sk1 witnesses the existential.
+;;
+;;   (atp--reset-counters)
+;;   (atp--formula-to-clauses '(forall (x) (exists (y) (loves x y))))
+;;   ;; => (((loves _V1 (_sk1 _V1))))
+;;   ;; The Skolem FUNCTION (_sk1 _V1) captures the dependency:
+;;   ;; for each x, there exists a (possibly different) y.
+;;
+;; This is correct: "everyone loves someone" becomes
+;; "everyone loves sk(themselves)" where sk is a function
+;; that picks the loved one depending on the lover.
+
+;; ============================================================
+;; Running these examples
+;; ============================================================
+;;
+;; In an interactive Emacs session:
+;;
+;;   (load-file "emacs-atp.el")
+;;
+;; Then evaluate any of the (prove ...) forms above.
+;; Pass t as the third argument for debug trace output.
+;;
+;; To run the dungeon game:
+;;
+;;   (load-file "atp-dungeon.el")
+;;   M-x dungeon-start
